@@ -1,0 +1,480 @@
+--- Preliminary Queries with Joins
+
+--- FIND  the first 20 orders with their customer_city and customer_state, joining orders and customers.
+SELECT
+	o.order_id,
+	o.order_purchase_timestamp,
+	c.customer_city,
+	c.customer_state
+FROM orders AS o
+JOIN customers AS c
+	ON o.customer_id = c.customer_id
+ORDER BY o.order_purchase_timestamp ASC
+LIMIT 20;
+
+--- FIND  the first 20 orders with the seller_id and price of each item, joining orders and order_items.
+SELECT 
+	o.order_id,
+	o.order_purchase_timestamp,
+	oi.seller_id,
+	oi.price
+FROM orders AS o
+JOIN order_items AS oi
+	ON o.order_id = oi.order_id
+ORDER BY o.order_purchase_timestamp ASC
+LIMIT 20;
+
+--- FIND  all products with their English category names, joining products with product_category_name_translation.
+SELECT 
+	p.product_id,
+	p.product_category_name,
+	pcnt.product_category_name_english
+FROM products AS p
+JOIN product_category_name_translation AS pcnt
+	ON p.product_category_name = pcnt.product_category_name
+ORDER BY p.product_category_name ASC;
+
+--- FIND  all sellers with their geolocation_city and geolocation_state, joining sellers with geolocation on zip code prefix.
+SELECT 
+	s.seller_id,
+	g.geolocation_city,
+	g.geolocation_state
+FROM sellers AS s
+JOIN geolocation AS g
+	ON s.seller_zip_code_prefix = g.geolocation_zip_code_prefix
+GROUP BY s.seller_id;
+
+--- FIND  all orders where there is at least one review, joining orders with order_reviews and listing order_id, review_score, and review_creation_date.
+SELECT 
+	o.order_id,
+	r.review_score,
+	r.review_creation_date
+FROM orders AS o
+JOIN order_reviews AS r
+	ON o.order_id = r.order_id
+WHERE r.review_score IS NOT NULL;
+
+--- FIND  all orders with both payment_type and total payment_value, joining orders with order_payments.
+SELECT 
+	o.order_id,
+	op.payment_type,
+	SUM(op.payment_value) AS total_payment_value
+FROM orders AS o
+JOIN order_payments AS op
+	ON o.order_id = op.order_id
+GROUP BY o.order_id;
+
+
+--- FIND  all customers and how many distinct sellers they have bought from, joining customers → orders → order_items → sellers.
+SELECT
+	c.customer_id,
+	COUNT(DISTINCT oi.seller_id) AS number_of_sellers
+FROM customers AS c
+	JOIN orders AS o 
+		ON c.customer_id = o.customer_id
+	JOIN order_items AS oi
+		ON o.order_id = oi.order_id
+GROUP BY c.customer_id
+ORDER BY number_of_sellers DESC;
+	
+	
+--- FIND  each order’s product categories, joining orders → order_items → products → product_category_name_translation.
+SELECT	
+	o.order_id AS order_id,
+	p.product_id AS product_id,
+	pcnt.product_category_name_english AS product_category
+FROM orders AS o
+	JOIN order_items AS oi
+		ON o.order_id = oi.order_id
+	JOIN products AS p
+		ON oi.product_id = p.product_id
+	JOIN product_category_name_translation as pcnt
+		ON p.product_category_name = pcnt.product_category_name
+ORDER BY product_category;
+
+--- FIND  all sellers and how many products they have sold, joining sellers with order_items and counting distinct product_id per seller_id.
+SELECT
+	s.seller_id,
+	COUNT(DISTINCT oi.product_id) AS number_of_products
+FROM sellers AS s
+	JOIN order_items AS oi
+		ON s.seller_id = oi.seller_id
+GROUP BY s.seller_id;
+
+--- FIND  the orders that took the longest time to deliver, using orders and computing the difference between order_purchase_timestamp and order_delivered_customer_date, then listing the top 20.
+SELECT
+	order_id,
+	order_purchase_timestamp,
+	order_delivered_customer_date,
+	ROUND (JULIANDAY(order_delivered_customer_date) - JULIANDAY(order_purchase_timestamp), 2) AS delivery_time
+FROM orders
+WHERE order_delivered_customer_date IS NOT NULL
+ORDER BY delivery_time DESC
+LIMIT 20;
+
+
+ --- DASHBOARD 1: Sales Overview
+
+ --- FIND  the total revenue (freight_value + price) and number of orders per month.
+ SELECT
+    CASE strftime('%m', o.order_purchase_timestamp)
+        WHEN '01' THEN 'January'
+        WHEN '02' THEN 'February'
+        WHEN '03' THEN 'March'
+        WHEN '04' THEN 'April'
+        WHEN '05' THEN 'May'
+        WHEN '06' THEN 'June'
+        WHEN '07' THEN 'July'
+        WHEN '08' THEN 'August'
+        WHEN '09' THEN 'September'
+        WHEN '10' THEN 'October'
+        WHEN '11' THEN 'November'
+        WHEN '12' THEN 'December'
+        ELSE 'Invalid Month'
+    END AS month,
+	COUNT(o.order_id) AS number_of_orders,
+	SUM(oi.freight_value + oi.price) AS total_revenue
+FROM orders AS o
+	JOIN order_items AS oi
+	ON o.order_id = oi.order_id
+GROUP BY month
+ORDER BY strftime('%m', o.order_purchase_timestamp) ASC;
+		
+--- FIND  the average order value per month.
+SELECT
+	t.month_name AS month,
+	ROUND(AVG(t.item_value), 2) AS average_item_value,
+	ROUND(AVG(t.payment_value), 2) AS average_payment_value
+FROM (	
+	SELECT o.order_id,
+	strftime('%m', o.order_purchase_timestamp) AS month_number,
+    CASE strftime('%m', o.order_purchase_timestamp)
+        WHEN '01' THEN 'January'
+        WHEN '02' THEN 'February'
+        WHEN '03' THEN 'March'
+        WHEN '04' THEN 'April'
+        WHEN '05' THEN 'May'
+        WHEN '06' THEN 'June'
+        WHEN '07' THEN 'July'
+        WHEN '08' THEN 'August'
+        WHEN '09' THEN 'September'
+        WHEN '10' THEN 'October'
+        WHEN '11' THEN 'November'
+        WHEN '12' THEN 'December'
+        ELSE 'Invalid Month'
+    END AS month_name,
+	SUM(oi.freight_value + oi.price) AS item_value,
+	SUM(op.payment_value) AS payment_value
+FROM orders AS o
+	JOIN order_items AS oi
+		ON o.order_id = oi.order_id
+	JOIN order_payments AS op
+	ON o.order_id = op.order_id
+GROUP BY month_name)
+AS t
+GROUP BY month
+ORDER BY t.month_number;
+
+
+--- FIND  total revenue and number of orders by payment type.
+SELECT 
+	op.payment_type AS payment_type,
+	COUNT(o.order_id) AS number_of_orders,
+	SUM(oi.price + oi.freight_value) AS total_revenue
+FROM order_payments AS op
+	JOIN orders AS o
+		ON op.order_id = o.order_id
+	JOIN order_items AS oi
+		ON o.order_id = oi.order_id
+GROUP BY payment_type;
+
+--- FIND  total revenue by product category per month.
+SELECT 
+	strftime('%m', o.order_purchase_timestamp) AS month_number,
+    CASE strftime('%m', o.order_purchase_timestamp)
+        WHEN '01' THEN 'January'
+        WHEN '02' THEN 'February'
+        WHEN '03' THEN 'March'
+        WHEN '04' THEN 'April'
+        WHEN '05' THEN 'May'
+        WHEN '06' THEN 'June'
+        WHEN '07' THEN 'July'
+        WHEN '08' THEN 'August'
+        WHEN '09' THEN 'September'
+        WHEN '10' THEN 'October'
+        WHEN '11' THEN 'November'
+        WHEN '12' THEN 'December'
+        ELSE 'Invalid Month'
+    END AS month,
+	pcnt.product_category_name_english AS product_category,
+	SUM(oi.price + oi.freight_value) AS total_revenue
+FROM orders AS o
+	JOIN order_items AS oi
+		ON o.order_id = oi.order_id
+	JOIN products AS p
+		ON oi.product_id = p.product_id
+	JOIN product_category_name_translation AS pcnt
+		ON p.product_category_name = pcnt.product_category_name
+GROUP BY month, product_category
+ORDER BY month_number;
+		
+--- FIND  the number of orders by order_status over time.
+SELECT
+		CASE strftime('%m', order_purchase_timestamp)
+        WHEN '01' THEN 'January'
+        WHEN '02' THEN 'February'
+        WHEN '03' THEN 'March'
+        WHEN '04' THEN 'April'
+        WHEN '05' THEN 'May'
+        WHEN '06' THEN 'June'
+        WHEN '07' THEN 'July'
+        WHEN '08' THEN 'August'
+        WHEN '09' THEN 'September'
+        WHEN '10' THEN 'October'
+        WHEN '11' THEN 'November'
+        WHEN '12' THEN 'December'
+        ELSE 'Invalid Month'
+    END AS month,
+	order_status,
+	COUNT(order_id) as number_of_orders
+FROM orders
+GROUP BY month, order_status
+ORDER BY strftime('%m', order_purchase_timestamp);
+ 
+--- DASHBOARD 2: Customer %& Geography
+
+--- FIND  the number of orders and total revenue per customer.
+SELECT 
+	c.customer_id AS customer,
+	COUNT(DISTINCT o.order_id) AS number_of_orders,
+	SUM(oi.price + oi.freight_value) AS total_revenue
+FROM customers AS c
+	JOIN orders AS o
+		ON c.customer_id = o.customer_id
+	JOIN order_items AS oi
+		ON o.order_id = oi.order_id
+GROUP BY customer
+ORDER BY total_revenue DESC;
+
+--- FIND  total orders and revenue per customer_state.
+SELECT
+	c.customer_state AS state,
+	COUNT(DISTINCT o.order_id) AS number_of_orders,
+	SUM(oi.price + oi.freight_value) AS total_revenue
+FROM customers AS c
+	JOIN orders AS o
+		ON c.customer_id = o.customer_id
+	JOIN order_items AS oi
+		ON o.order_id = oi.order_id
+GROUP BY state
+ORDER BY state;
+
+--- FIND  total orders and revenue per customer_city.
+SELECT
+	c.customer_city AS city,
+	COUNT(DISTINCT o.order_id) AS number_of_orders,
+	SUM(oi.price + oi.freight_value) AS total_revenue
+FROM customers AS c
+	JOIN orders AS o
+		ON c.customer_id = o.customer_id
+	JOIN order_items AS oi
+		ON o.order_id = oi.order_id
+GROUP BY city
+ORDER BY city;
+
+--- FIND  the latitude/longitude and number of orders per geolocation_zip_code_prefix.
+SELECT
+	g.geolocation_zip_code_prefix AS zipcode,
+	g.geolocation_lng AS longitude,
+	g.geolocation_lat AS latitude,
+	COUNT(DISTINCT o.order_id) AS number_of_orders
+FROM geolocation AS g
+	JOIN customers AS c
+		ON g.geolocation_zip_code_prefix = c.customer_zip_code_prefix
+	JOIN orders AS o
+		ON c.customer_id = o.customer_id
+GROUP BY zipcode
+ORDER BY zipcode;
+
+--- FIND  the average number of orders per customer.
+SELECT
+    ROUND(AVG(order_count), 2) AS avg_orders_per_customer
+FROM (
+    SELECT
+        c.customer_id,
+        COUNT(DISTINCT o.order_id) AS order_count
+    FROM customers AS c
+    LEFT JOIN orders AS o
+        ON c.customer_id = o.customer_id
+    GROUP BY c.customer_id
+);
+
+--- Dashboard 3 – Product & Category Performance
+
+--- FIND  total revenue, quantity sold, and number of orders per product category.
+SELECT
+	pcnt.product_category_name_english AS product_category,
+	COUNT(oi.order_id) AS quantity_sold,
+	SUM(oi.price + oi.freight_value) AS total_revenue
+FROM product_category_name_translation AS pcnt
+	JOIN products AS p
+		ON pcnt.product_category_name = p.product_category_name
+	JOIN order_items AS oi
+		ON p.product_id = oi.product_id
+GROUP BY product_category
+ORDER BY total_revenue DESC;
+	
+
+--- FIND  the average review_score per product category.
+SELECT 
+	pcnt.product_category_name_english AS product_category,
+	ROUND(AVG(ore.review_score), 1) AS avg_review_score
+FROM product_category_name_translation AS pcnt
+	JOIN products AS p 
+		ON pcnt.product_category_name = p.product_category_name
+	JOIN order_items AS oi
+		ON p.product_id = oi.product_id
+	JOIN order_reviews AS ore
+		ON oi.order_id = ore.order_id
+GROUP BY product_category
+ORDER BY avg_review_score DESC;
+
+
+--- FIND  average price and average freight_value per category.
+SELECT 
+	pcnt.product_category_name_english AS product_category,
+	COUNT(p.product_id) AS number_of_products,
+	ROUND(AVG(oi.price), 1) AS average_price,
+	ROUND(AVG(freight_value), 1) AS average_freight_value
+FROM product_category_name_translation AS pcnt
+	JOIN products AS p 
+		ON pcnt.product_category_name = p.product_category_name
+	JOIN order_items AS oi
+		ON p.product_id = oi.product_id
+GROUP BY product_category
+ORDER BY number_of_products DESC;
+
+--- Dashboard 4 – Seller & Delivery Performance
+
+--- FIND  total revenue and number of orders per seller.
+SELECT 
+	SUBSTR(s.seller_id, 1, 6) AS seller,
+	s.seller_city AS seller_city,
+	SUM(oi.price + oi.freight_value) AS total_revenue,
+	COUNT(DISTINCT o.order_id) AS number_of_orders
+FROM sellers AS s
+	JOIN order_items AS oi
+		ON s.seller_id = oi.seller_id
+	JOIN orders AS o
+		ON oi.order_id = o.order_id
+GROUP BY seller
+ORDER BY total_revenue DESC;
+
+SELECT COUNT(DISTINCT seller_id) FROM sellers;  --- I did this to check the actual number of sellers in the database. I had to use a substring for the seller ids so this was to ensure I was capturing all the sellers as some may have had similar characters to start the ids  
+--- for example, when I ran the query as SUBSTR(s.seller_id, 1, 5), I got 3091 rows of results instead of 3095 
+
+--- FIND  average review_score per seller.
+SELECT 
+	SUBSTR(s.seller_id, 1, 6) AS seller,
+	s.seller_city AS seller_city,
+	ROUND(AVG(ore.review_score), 1) AS average_review
+FROM sellers AS s
+	JOIN order_items AS oi
+		ON s.seller_id = oi.seller_id
+	JOIN order_reviews AS ore
+		ON oi.order_id = ore.order_id
+GROUP BY seller
+ORDER BY average_review DESC;
+
+--- FIND  the average delivery time variance for each seller.
+SELECT
+	SUBSTR(s.seller_id, 1, 6) AS seller,
+	s.seller_city AS seller_city,
+	ROUND (AVG (JULIANDAY(o.order_estimated_delivery_date) - JULIANDAY(o.order_purchase_timestamp)), 2) AS estimated_delivery_time,
+	ROUND (AVG (JULIANDAY(o.order_delivered_customer_date) - JULIANDAY(o.order_purchase_timestamp)), 2) AS actual_delivery_time,
+	ROUND (AVG (JULIANDAY(o.order_estimated_delivery_date) - JULIANDAY(o.order_purchase_timestamp)) - AVG (JULIANDAY(o.order_delivered_customer_date) - JULIANDAY(o.order_purchase_timestamp))) AS variance
+FROM sellers AS s
+	JOIN order_items as oi
+		ON s.seller_id = oi.seller_id
+	JOIN orders as o
+		ON oi.order_id = o.order_id
+WHERE o.order_delivered_customer_date IS NOT NULL
+GROUP BY seller
+ORDER BY variance DESC;
+	
+
+--- FIND  total revenue and number of sellers per seller_state.
+SELECT 
+	s.seller_state AS state,
+	COUNT(DISTINCT s.seller_id) AS number_of_sellers,
+	SUM(oi.price + oi.freight_value) AS total_revenue
+FROM sellers As s
+	JOIN order_items AS oi
+		ON s.seller_id = oi.seller_id
+	JOIN orders AS o
+		ON oi.order_id = o.order_id
+GROUP BY state
+ORDER BY total_revenue DESC;
+	
+	
+--- FIND  the distribution of order_status per seller.
+SELECT
+	SUBSTR(s.seller_id, 1, 6) AS seller,
+	o.order_status as order_status,
+	COUNT(o.order_id) AS number_of_orders
+FROM sellers AS s
+	JOIN order_items AS oi
+		on s.seller_id = oi.seller_id
+	JOIN orders AS o 
+		ON oi.order_id = o.order_id
+GROUP BY seller, order_status
+ORDER BY seller, number_of_orders DESC;
+
+-- Find the number of sellers with each order status
+SELECT
+	o.order_status as order_status,
+	COUNT(s.seller_id) AS number_of_sellers
+FROM orders AS o
+	JOIN order_items AS oi
+		ON o.order_id = oi.order_id
+	JOIN sellers as s
+		ON oi.seller_id = s.seller_id
+GROUP BY order_status
+ORDER BY number_of_sellers;
+
+--- Dashboard 5 – Leads & Conversion Funnel
+
+--- FIND  the number of qualified leads per origin.
+SELECT
+	origin, 
+	COUNT (DISTINCT mql_id) AS number_qualified_leads
+FROM leads_qualified
+GROUP BY origin
+ORDER BY number_qualified_leads DESC;
+
+--- FIND  the leads conversion rate
+SELECT
+    q.origin,
+    COUNT(DISTINCT q.mql_id) AS qualified_leads,
+    COUNT(DISTINCT c.mql_id) AS closed_leads,
+    ROUND(
+        COUNT(DISTINCT c.mql_id) * 1.0 / COUNT(DISTINCT q.mql_id) * 100,
+        2
+    ) AS conversion_rate_pct
+FROM leads_qualified q
+LEFT JOIN leads_closed c
+    ON q.mql_id = c.mql_id
+WHERE origin IS NOT NULL
+GROUP BY
+    q.origin
+ORDER BY
+    conversion_rate_pct DESC;
+
+ --- FIND the average revenue per business_segment
+ SELECT
+	business_segment,
+	ROUND (AVG(declared_monthly_revenue),2) AS avg_revenue
+FROM leads_closed
+WHERE business_segment IS NOT NULL
+GROUP BY business_segment
+ORDER BY avg_revenue;
