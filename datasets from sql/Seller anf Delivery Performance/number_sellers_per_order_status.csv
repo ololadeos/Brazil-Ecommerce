@@ -1,0 +1,8 @@
+order_status,number_of_sellers
+approved,3
+unavailable,7
+processing,357
+invoiced,359
+canceled,542
+shipped,1185
+delivered,110197

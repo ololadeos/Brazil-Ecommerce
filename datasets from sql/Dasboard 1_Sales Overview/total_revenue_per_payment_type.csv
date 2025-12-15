@@ -1,0 +1,5 @@
+payment_type,number_of_orders,total_revenue
+boleto,22867,2842240.29
+credit_card,86769,12723914.88
+debit_card,1691,215306.74
+voucher,6274,785081.94
