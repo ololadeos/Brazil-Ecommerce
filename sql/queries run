@@ -442,7 +442,7 @@ FROM orders AS o
 GROUP BY order_status
 ORDER BY number_of_sellers;
 
---- Dashboard 5 – Leads & Conversion Funnel
+--- Dashboard 5 – Leads & Conversion Funnel.
 
 --- FIND  the number of qualified leads per origin.
 SELECT
