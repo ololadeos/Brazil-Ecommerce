@@ -3,14 +3,6 @@ This project analyzes a multi-table e-commerce dataset using **SQL** for data ex
 The objective was to answer real business questions related to **sales performance, customer behavior, product categories, seller efficiency, delivery performance, and lead conversion**.
 
 ---
-
-##  Tools Used
-- DB Browser for SQLite
-- Tableau
-- GitHub
-
----
-
 ## Dataset Description
 The dataset is a relational e-commerce database containing tables such as:
 - `orders`, `order_items`, `order_reviews`
@@ -20,6 +12,22 @@ The dataset is a relational e-commerce database containing tables such as:
 
 [Datasource](https://www.kaggle.com/datasets/terencicp/e-commerce-dataset-by-olist-as-an-sqlite-database?utm_source=chatgpt.com)
 
+---
+##  Tools Used
+- DB Browser for SQLite
+- Tableau
+- GitHub
+
+---
+# Technical Highlights (SQL)
+To prepare the data for visualization, I performed complex transformations including:
+- Multi-Table Joins: Linked orders, items, customers, and translation tables to create a unified view of sales across different languages.
+- Aggregations & Grouping: Calculated monthly churn, average order value (AOV), and seller performance metrics using SUM, AVG, and GROUP BY.
+- Data Cleaning: Handled null values in delivery timestamps to accurately calculate the "Days Ahead of Schedule" metric.
+- Geospatial Prep: Aggregated revenue by state and city to power the Tableau map visualizations.
+
+
+---
 ## Dashboards & Analysis
 You can explore the interactive Tableau Story here: [Ecommerce in Brazil](https://public.tableau.com/views/Ecommerce_17651586272370/EcommerceinBrazilin2017and2018?:language=en-GB&:sid=&:redirect=auth&:display_count=n&:origin=viz_share_link) 
 
